@@ -704,24 +704,37 @@
                 };
             });
             
+            // Track when audio actually ends
+            let audioEnded = false;
+            source.onended = () => { audioEnded = true; };
+            
             mediaRecorder.start(100); // Get data every 100ms to reduce memory pressure
+            
+            // Record the audio context time when we start
+            const audioStartTime = audioCtx.currentTime;
             source.start();
             
-            // Render using requestAnimationFrame for smooth performance
-            const startTime = performance.now();
+            // Render using requestAnimationFrame, synced to AUDIO time not wall clock
             let lastProgressUpdate = 0;
             
             await new Promise((resolve) => {
                 function renderLoop() {
-                    const elapsed = performance.now() - startTime;
-                    const currentFrame = Math.floor(elapsed / frameDuration);
+                    // Use audio context time for perfect sync
+                    const audioElapsed = audioCtx.currentTime - audioStartTime;
+                    const currentFrame = Math.floor(audioElapsed * fps);
                     
-                    if (currentFrame >= totalFrames) {
+                    // Exit when audio has ended AND we've rendered enough frames
+                    if (audioEnded || currentFrame >= totalFrames) {
+                        // Render one more frame to ensure we capture the end
+                        if (currentFrame < totalFrames) {
+                            renderFrame(frameData[Math.min(currentFrame, totalFrames - 1)], numBars);
+                            if (videoTrack.requestFrame) videoTrack.requestFrame();
+                        }
                         resolve();
                         return;
                     }
                     
-                    // Render current frame based on elapsed time (auto-skips if behind)
+                    // Render current frame based on audio time
                     const frameIndex = Math.min(currentFrame, totalFrames - 1);
                     renderFrame(frameData[frameIndex], numBars);
                     
@@ -743,6 +756,9 @@
                 
                 requestAnimationFrame(renderLoop);
             });
+            
+            // Small delay to ensure final frames are captured
+            await new Promise(r => setTimeout(r, 200));
             
             // Stop recording
             source.stop();
