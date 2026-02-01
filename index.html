@@ -142,6 +142,7 @@
         .color-btn[data-color="gold"] { background: #ffd700; }
         .color-btn[data-color="cool"] { background: linear-gradient(135deg, #0066ff, #00ffff); }
         .color-btn[data-color="warm"] { background: linear-gradient(135deg, #ff6600, #ffcc00); }
+        .color-btn[data-color="rainbow"] { background: linear-gradient(90deg, #ff0000, #ff8000, #ffff00, #00ff00, #0080ff, #8000ff); }
 
         .slider-container { display: flex; align-items: center; gap: 15px; }
 
@@ -337,6 +338,7 @@
                         <button class="color-btn" data-color="gold" title="Gold"></button>
                         <button class="color-btn" data-color="cool" title="Cool Gradient"></button>
                         <button class="color-btn" data-color="warm" title="Warm Gradient"></button>
+                        <button class="color-btn" data-color="rainbow" title="Rainbow"></button>
                     </div>
                 </div>
 
@@ -345,6 +347,14 @@
                     <div class="slider-container">
                         <input type="range" class="slider" id="numBars" min="16" max="128" value="64">
                         <span class="slider-value" id="numBarsValue">64</span>
+                    </div>
+                </div>
+
+                <div class="setting-group">
+                    <label class="setting-label">Bar Height</label>
+                    <div class="slider-container">
+                        <input type="range" class="slider" id="barHeight" min="30" max="95" value="75">
+                        <span class="slider-value" id="barHeightValue">75%</span>
                     </div>
                 </div>
             </div>
@@ -394,10 +404,13 @@
         const ctx = previewCanvas.getContext('2d');
         const numBarsSlider = document.getElementById('numBars');
         const numBarsValue = document.getElementById('numBarsValue');
+        const barHeightSlider = document.getElementById('barHeight');
+        const barHeightValue = document.getElementById('barHeightValue');
 
         let selectedFile = null;
         let selectedStyle = 'bars';
         let selectedColor = 'white';
+        let selectedBarHeight = 0.75;
         let audioContext = null;
         let audioBuffer = null;
         let ffmpeg = null;
@@ -422,8 +435,27 @@
             } else if (colorName === 'warm') {
                 const t = index / total;
                 return [255, Math.floor(75 + t * 125), Math.floor(t * 50)];
+            } else if (colorName === 'rainbow') {
+                const hue = (index / total) * 360;
+                return hslToRgb(hue, 100, 50);
             }
             return colors[colorName] || colors.white;
+        }
+
+        function hslToRgb(h, s, l) {
+            s /= 100;
+            l /= 100;
+            const c = (1 - Math.abs(2 * l - 1)) * s;
+            const x = c * (1 - Math.abs((h / 60) % 2 - 1));
+            const m = l - c / 2;
+            let r = 0, g = 0, b = 0;
+            if (h < 60) { r = c; g = x; b = 0; }
+            else if (h < 120) { r = x; g = c; b = 0; }
+            else if (h < 180) { r = 0; g = c; b = x; }
+            else if (h < 240) { r = 0; g = x; b = c; }
+            else if (h < 300) { r = x; g = 0; b = c; }
+            else { r = c; g = 0; b = x; }
+            return [Math.floor((r + m) * 255), Math.floor((g + m) * 255), Math.floor((b + m) * 255)];
         }
 
         // Drag and drop
@@ -491,6 +523,11 @@
 
         numBarsSlider.addEventListener('input', () => {
             numBarsValue.textContent = numBarsSlider.value;
+        });
+
+        barHeightSlider.addEventListener('input', () => {
+            barHeightValue.textContent = barHeightSlider.value + '%';
+            selectedBarHeight = parseInt(barHeightSlider.value) / 100;
         });
 
         // Load ffmpeg for MP4 conversion
@@ -755,11 +792,12 @@
             const gapWidth = barWidth * gapRatio;
             const startX = (width - totalWidth) / 2;
             const centerY = height / 2;
+            const maxHeight = selectedBarHeight * (mirrored ? 0.48 : 0.95);
             
             for (let i = 0; i < numBars; i++) {
                 const x = startX + i * (barWidth + gapWidth);
                 const value = Math.min(bands[i], 1);
-                const barHeight = value * height * (mirrored ? 0.4 : 0.55);
+                const barHeight = value * height * maxHeight;
                 
                 const [r, g, b] = getColor(selectedColor, i, numBars, value);
                 const alpha = 0.7 + value * 0.3;
@@ -786,8 +824,8 @@
         function renderCircular(bands, numBars, width, height) {
             const centerX = width / 2;
             const centerY = height / 2;
-            const innerRadius = Math.min(width, height) * 0.15;
-            const maxBarLength = Math.min(width, height) * 0.25;
+            const innerRadius = Math.min(width, height) * 0.12;
+            const maxBarLength = Math.min(width, height) * 0.35 * selectedBarHeight;
             
             ctx.lineWidth = 3;
             ctx.lineCap = 'round';
@@ -815,7 +853,7 @@
 
         function renderWaveform(bands, numBars, width, height) {
             const centerY = height / 2;
-            const amplitude = height * 0.3;
+            const amplitude = height * 0.45 * selectedBarHeight;
             const startX = width * 0.05;
             const endX = width * 0.95;
             const step = (endX - startX) / (numBars - 1);
