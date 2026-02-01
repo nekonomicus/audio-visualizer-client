@@ -1,0 +1,819 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Audio Visualizer - Client-Side</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #0a0a0b;
+            color: #fff;
+            min-height: 100vh;
+            padding: 40px 20px;
+        }
+
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+        }
+
+        h1 {
+            text-align: center;
+            font-size: 2.5rem;
+            font-weight: 300;
+            margin-bottom: 10px;
+        }
+
+        .subtitle {
+            text-align: center;
+            color: #666;
+            margin-bottom: 40px;
+        }
+
+        .badge {
+            display: inline-block;
+            background: #1a1a1a;
+            color: #4ade80;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 0.75rem;
+            margin-left: 10px;
+            vertical-align: middle;
+        }
+
+        .drop-zone {
+            border: 2px dashed #333;
+            border-radius: 16px;
+            padding: 60px 40px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            background: #111;
+            margin-bottom: 30px;
+        }
+
+        .drop-zone:hover, .drop-zone.dragover {
+            border-color: #fff;
+            background: #1a1a1a;
+        }
+
+        .drop-zone.has-file {
+            border-color: #4ade80;
+            background: rgba(74, 222, 128, 0.05);
+        }
+
+        .drop-zone-icon { font-size: 3rem; margin-bottom: 15px; opacity: 0.5; }
+        .drop-zone-text { font-size: 1.1rem; color: #888; margin-bottom: 10px; }
+        .drop-zone-hint { font-size: 0.85rem; color: #555; }
+        .file-name { color: #4ade80; font-weight: 500; font-size: 1.1rem; }
+
+        .settings {
+            background: #111;
+            border-radius: 16px;
+            padding: 30px;
+            margin-bottom: 30px;
+        }
+
+        .settings h2 {
+            font-size: 1.2rem;
+            font-weight: 500;
+            margin-bottom: 25px;
+            color: #888;
+        }
+
+        .setting-group { margin-bottom: 25px; }
+        .setting-group:last-child { margin-bottom: 0; }
+
+        .setting-label {
+            display: block;
+            font-size: 0.9rem;
+            color: #666;
+            margin-bottom: 10px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .style-options, .color-options {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .option-btn {
+            padding: 12px 20px;
+            border: 1px solid #333;
+            background: transparent;
+            color: #fff;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            font-size: 0.9rem;
+        }
+
+        .option-btn:hover { border-color: #555; background: #1a1a1a; }
+        .option-btn.active { border-color: #fff; background: #fff; color: #000; }
+
+        .color-btn {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            border: 2px solid #333;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .color-btn:hover { transform: scale(1.1); }
+        .color-btn.active { border-color: #fff; box-shadow: 0 0 0 2px #0a0a0b, 0 0 0 4px #fff; }
+
+        .color-btn[data-color="white"] { background: #fff; }
+        .color-btn[data-color="cyan"] { background: #00e5ff; }
+        .color-btn[data-color="magenta"] { background: #ff00cc; }
+        .color-btn[data-color="green"] { background: #33ff66; }
+        .color-btn[data-color="orange"] { background: #ff8000; }
+        .color-btn[data-color="gold"] { background: #ffd700; }
+        .color-btn[data-color="cool"] { background: linear-gradient(135deg, #0066ff, #00ffff); }
+        .color-btn[data-color="warm"] { background: linear-gradient(135deg, #ff6600, #ffcc00); }
+
+        .slider-container { display: flex; align-items: center; gap: 15px; }
+
+        .slider {
+            flex: 1;
+            -webkit-appearance: none;
+            height: 6px;
+            background: #333;
+            border-radius: 3px;
+            outline: none;
+        }
+
+        .slider::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 18px;
+            height: 18px;
+            background: #fff;
+            border-radius: 50%;
+            cursor: pointer;
+        }
+
+        .slider-value { min-width: 40px; text-align: right; color: #888; font-size: 0.9rem; }
+
+        .generate-btn {
+            width: 100%;
+            padding: 18px;
+            font-size: 1.1rem;
+            font-weight: 500;
+            background: #fff;
+            color: #000;
+            border: none;
+            border-radius: 12px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .generate-btn:hover:not(:disabled) { background: #eee; transform: translateY(-1px); }
+        .generate-btn:disabled { opacity: 0.3; cursor: not-allowed; }
+
+        .progress-section {
+            display: none;
+            background: #111;
+            border-radius: 16px;
+            padding: 30px;
+            margin-bottom: 30px;
+        }
+
+        .progress-section.visible { display: block; }
+
+        .progress-bar-container {
+            background: #222;
+            border-radius: 10px;
+            height: 20px;
+            overflow: hidden;
+            margin-bottom: 15px;
+        }
+
+        .progress-bar {
+            height: 100%;
+            background: linear-gradient(90deg, #4ade80, #22c55e);
+            width: 0%;
+            transition: width 0.3s ease;
+        }
+
+        .progress-text { text-align: center; color: #888; }
+
+        .preview-section {
+            display: none;
+            background: #111;
+            border-radius: 16px;
+            padding: 20px;
+            margin-bottom: 30px;
+        }
+
+        .preview-section.visible { display: block; }
+
+        #previewCanvas {
+            width: 100%;
+            border-radius: 8px;
+            background: #000;
+        }
+
+        .result-section {
+            display: none;
+            background: #111;
+            border-radius: 16px;
+            padding: 30px;
+            text-align: center;
+        }
+
+        .result-section.visible { display: block; }
+
+        .result-section video {
+            width: 100%;
+            max-width: 100%;
+            border-radius: 12px;
+            margin-bottom: 20px;
+            background: #000;
+        }
+
+        .download-btn {
+            display: inline-block;
+            padding: 14px 40px;
+            font-size: 1rem;
+            font-weight: 500;
+            background: #4ade80;
+            color: #000;
+            border: none;
+            border-radius: 10px;
+            cursor: pointer;
+            text-decoration: none;
+            transition: all 0.2s ease;
+        }
+
+        .download-btn:hover { background: #22c55e; }
+
+        .new-btn {
+            display: inline-block;
+            padding: 14px 40px;
+            font-size: 1rem;
+            background: transparent;
+            color: #888;
+            border: 1px solid #333;
+            border-radius: 10px;
+            cursor: pointer;
+            margin-left: 10px;
+        }
+
+        .new-btn:hover { border-color: #555; color: #fff; }
+
+        .error-message {
+            background: rgba(239, 68, 68, 0.1);
+            border: 1px solid #ef4444;
+            color: #ef4444;
+            padding: 15px 20px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            display: none;
+        }
+
+        .error-message.visible { display: block; }
+
+        footer {
+            text-align: center;
+            margin-top: 50px;
+            color: #444;
+            font-size: 0.85rem;
+        }
+
+        @media (max-width: 600px) {
+            h1 { font-size: 1.8rem; }
+            .drop-zone { padding: 40px 20px; }
+            .settings { padding: 20px; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Audio Visualizer <span class="badge">Runs Locally</span></h1>
+        <p class="subtitle">Create visualizations from your audio - all processing happens in your browser</p>
+
+        <div class="error-message" id="errorMessage"></div>
+
+        <div id="uploadSection">
+            <input type="file" id="fileInput" accept="audio/*" hidden>
+            <div class="drop-zone" id="dropZone">
+                <div class="drop-zone-icon">🎵</div>
+                <div class="drop-zone-text">Drop your audio file here</div>
+                <div class="drop-zone-hint">or click to browse • MP3, WAV, OGG, M4A</div>
+            </div>
+
+            <div class="settings">
+                <h2>Settings</h2>
+                
+                <div class="setting-group">
+                    <label class="setting-label">Visualization Style</label>
+                    <div class="style-options">
+                        <button class="option-btn active" data-style="bars">Bars</button>
+                        <button class="option-btn" data-style="mirrored">Mirrored</button>
+                        <button class="option-btn" data-style="circular">Circular</button>
+                        <button class="option-btn" data-style="waveform">Waveform</button>
+                    </div>
+                </div>
+
+                <div class="setting-group">
+                    <label class="setting-label">Color</label>
+                    <div class="color-options">
+                        <button class="color-btn active" data-color="white" title="White"></button>
+                        <button class="color-btn" data-color="cyan" title="Cyan"></button>
+                        <button class="color-btn" data-color="magenta" title="Magenta"></button>
+                        <button class="color-btn" data-color="green" title="Green"></button>
+                        <button class="color-btn" data-color="orange" title="Orange"></button>
+                        <button class="color-btn" data-color="gold" title="Gold"></button>
+                        <button class="color-btn" data-color="cool" title="Cool Gradient"></button>
+                        <button class="color-btn" data-color="warm" title="Warm Gradient"></button>
+                    </div>
+                </div>
+
+                <div class="setting-group">
+                    <label class="setting-label">Number of Bars</label>
+                    <div class="slider-container">
+                        <input type="range" class="slider" id="numBars" min="16" max="128" value="64">
+                        <span class="slider-value" id="numBarsValue">64</span>
+                    </div>
+                </div>
+            </div>
+
+            <button class="generate-btn" id="generateBtn" disabled>Generate Video</button>
+        </div>
+
+        <div class="preview-section" id="previewSection">
+            <canvas id="previewCanvas" width="1920" height="1080"></canvas>
+        </div>
+
+        <div class="progress-section" id="progressSection">
+            <div class="progress-bar-container">
+                <div class="progress-bar" id="progressBar"></div>
+            </div>
+            <div class="progress-text" id="progressText">Analyzing audio...</div>
+        </div>
+
+        <div class="result-section" id="resultSection">
+            <video id="resultVideo" controls></video>
+            <div>
+                <a class="download-btn" id="downloadBtn" href="#" download="visualizer.webm">Download Video</a>
+                <button class="new-btn" id="newBtn">Create Another</button>
+            </div>
+        </div>
+
+        <footer>
+            1920×1080 • 30fps • Processed entirely in your browser
+        </footer>
+    </div>
+
+    <script>
+        const dropZone = document.getElementById('dropZone');
+        const fileInput = document.getElementById('fileInput');
+        const generateBtn = document.getElementById('generateBtn');
+        const uploadSection = document.getElementById('uploadSection');
+        const previewSection = document.getElementById('previewSection');
+        const progressSection = document.getElementById('progressSection');
+        const progressBar = document.getElementById('progressBar');
+        const progressText = document.getElementById('progressText');
+        const resultSection = document.getElementById('resultSection');
+        const resultVideo = document.getElementById('resultVideo');
+        const downloadBtn = document.getElementById('downloadBtn');
+        const newBtn = document.getElementById('newBtn');
+        const errorMessage = document.getElementById('errorMessage');
+        const previewCanvas = document.getElementById('previewCanvas');
+        const ctx = previewCanvas.getContext('2d');
+        const numBarsSlider = document.getElementById('numBars');
+        const numBarsValue = document.getElementById('numBarsValue');
+
+        let selectedFile = null;
+        let selectedStyle = 'bars';
+        let selectedColor = 'white';
+        let audioContext = null;
+        let audioBuffer = null;
+
+        // Color definitions
+        const colors = {
+            white: [255, 255, 255],
+            cyan: [0, 229, 255],
+            magenta: [255, 0, 204],
+            green: [51, 255, 102],
+            orange: [255, 128, 0],
+            gold: [255, 215, 0],
+            cool: 'cool',
+            warm: 'warm'
+        };
+
+        function getColor(colorName, index, total, value) {
+            if (colorName === 'cool') {
+                const t = index / total;
+                return [Math.floor(t * 50), Math.floor(100 + t * 155), Math.floor(200 + t * 55)];
+            } else if (colorName === 'warm') {
+                const t = index / total;
+                return [255, Math.floor(75 + t * 125), Math.floor(t * 50)];
+            }
+            return colors[colorName] || colors.white;
+        }
+
+        // Drag and drop
+        dropZone.addEventListener('click', () => fileInput.click());
+        
+        dropZone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            dropZone.classList.add('dragover');
+        });
+
+        dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover'));
+
+        dropZone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            dropZone.classList.remove('dragover');
+            if (e.dataTransfer.files.length > 0) handleFile(e.dataTransfer.files[0]);
+        });
+
+        fileInput.addEventListener('change', (e) => {
+            if (e.target.files.length > 0) handleFile(e.target.files[0]);
+        });
+
+        async function handleFile(file) {
+            if (!file.type.startsWith('audio/')) {
+                showError('Please select a valid audio file');
+                return;
+            }
+
+            selectedFile = file;
+            dropZone.classList.add('has-file');
+            dropZone.innerHTML = `
+                <div class="drop-zone-icon">✓</div>
+                <div class="file-name">${file.name}</div>
+                <div class="drop-zone-hint">Click or drop to change file</div>
+            `;
+            generateBtn.disabled = false;
+            hideError();
+
+            // Decode audio for preview
+            try {
+                audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                const arrayBuffer = await file.arrayBuffer();
+                audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
+            } catch (err) {
+                showError('Could not decode audio file: ' + err.message);
+            }
+        }
+
+        // Style/color selection
+        document.querySelectorAll('.option-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                document.querySelectorAll('.option-btn').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                selectedStyle = btn.dataset.style;
+            });
+        });
+
+        document.querySelectorAll('.color-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                document.querySelectorAll('.color-btn').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                selectedColor = btn.dataset.color;
+            });
+        });
+
+        numBarsSlider.addEventListener('input', () => {
+            numBarsValue.textContent = numBarsSlider.value;
+        });
+
+        // Main generation
+        generateBtn.addEventListener('click', async () => {
+            if (!selectedFile || !audioBuffer) return;
+
+            hideError();
+            uploadSection.style.display = 'none';
+            previewSection.classList.add('visible');
+            progressSection.classList.add('visible');
+            resultSection.classList.remove('visible');
+
+            try {
+                await generateVideo();
+            } catch (err) {
+                showError('Error generating video: ' + err.message);
+                uploadSection.style.display = 'block';
+                previewSection.classList.remove('visible');
+                progressSection.classList.remove('visible');
+            }
+        });
+
+        async function generateVideo() {
+            const fps = 30;
+            const numBars = parseInt(numBarsSlider.value);
+            const duration = audioBuffer.duration;
+            const totalFrames = Math.floor(duration * fps);
+            
+            // Analyze audio
+            progressText.textContent = 'Analyzing audio...';
+            progressBar.style.width = '5%';
+            
+            const channelData = audioBuffer.getChannelData(0);
+            const sampleRate = audioBuffer.sampleRate;
+            const samplesPerFrame = Math.floor(sampleRate / fps);
+            
+            // Pre-compute frequency data for each frame
+            const frameData = [];
+            const fftSize = 2048;
+            
+            for (let frame = 0; frame < totalFrames; frame++) {
+                const startSample = frame * samplesPerFrame;
+                const endSample = Math.min(startSample + fftSize, channelData.length);
+                
+                // Get samples for this frame
+                const samples = channelData.slice(startSample, endSample);
+                
+                // Simple FFT approximation using band energy
+                const bands = new Float32Array(numBars);
+                const bandSize = Math.floor(samples.length / numBars);
+                
+                for (let i = 0; i < numBars; i++) {
+                    let sum = 0;
+                    for (let j = 0; j < bandSize; j++) {
+                        const idx = i * bandSize + j;
+                        if (idx < samples.length) {
+                            sum += Math.abs(samples[idx]);
+                        }
+                    }
+                    // Apply frequency weighting (boost bass, reduce highs)
+                    const freqWeight = 1 - (i / numBars) * 0.5;
+                    bands[i] = (sum / bandSize) * freqWeight * 3;
+                }
+                
+                // Smooth with previous frame
+                if (frameData.length > 0) {
+                    const prev = frameData[frameData.length - 1];
+                    for (let i = 0; i < numBars; i++) {
+                        bands[i] = prev[i] * 0.3 + bands[i] * 0.7;
+                    }
+                }
+                
+                frameData.push(bands);
+                
+                if (frame % 100 === 0) {
+                    progressBar.style.width = (5 + (frame / totalFrames) * 20) + '%';
+                    await new Promise(r => setTimeout(r, 0));
+                }
+            }
+            
+            // Set up canvas recording
+            progressText.textContent = 'Rendering video...';
+            progressBar.style.width = '25%';
+            
+            const stream = previewCanvas.captureStream(fps);
+            
+            // Add audio track
+            const audioCtx = new AudioContext();
+            const source = audioCtx.createBufferSource();
+            source.buffer = audioBuffer;
+            const dest = audioCtx.createMediaStreamDestination();
+            source.connect(dest);
+            source.connect(audioCtx.destination); // Also play through speakers
+            
+            // Combine video and audio streams
+            const combinedStream = new MediaStream([
+                ...stream.getVideoTracks(),
+                ...dest.stream.getAudioTracks()
+            ]);
+            
+            const mediaRecorder = new MediaRecorder(combinedStream, {
+                mimeType: 'video/webm;codecs=vp9,opus',
+                videoBitsPerSecond: 8000000
+            });
+            
+            const chunks = [];
+            mediaRecorder.ondataavailable = (e) => chunks.push(e.data);
+            
+            const recordingPromise = new Promise((resolve) => {
+                mediaRecorder.onstop = () => {
+                    const blob = new Blob(chunks, { type: 'video/webm' });
+                    resolve(blob);
+                };
+            });
+            
+            mediaRecorder.start();
+            source.start();
+            
+            // Render frames
+            const startTime = performance.now();
+            
+            for (let frame = 0; frame < totalFrames; frame++) {
+                renderFrame(frameData[frame], numBars);
+                
+                // Update progress
+                if (frame % 30 === 0) {
+                    const progress = 25 + (frame / totalFrames) * 70;
+                    progressBar.style.width = progress + '%';
+                    progressText.textContent = `Rendering: ${Math.floor(frame / totalFrames * 100)}%`;
+                }
+                
+                // Wait for next frame timing
+                const targetTime = startTime + (frame + 1) * (1000 / fps);
+                const now = performance.now();
+                if (targetTime > now) {
+                    await new Promise(r => setTimeout(r, targetTime - now));
+                }
+            }
+            
+            // Stop recording
+            source.stop();
+            mediaRecorder.stop();
+            audioCtx.close();
+            
+            progressText.textContent = 'Finalizing...';
+            progressBar.style.width = '95%';
+            
+            const videoBlob = await recordingPromise;
+            
+            // Show result
+            progressBar.style.width = '100%';
+            progressText.textContent = 'Complete!';
+            
+            const videoUrl = URL.createObjectURL(videoBlob);
+            resultVideo.src = videoUrl;
+            downloadBtn.href = videoUrl;
+            downloadBtn.download = `visualizer_${Date.now()}.webm`;
+            
+            previewSection.classList.remove('visible');
+            progressSection.classList.remove('visible');
+            resultSection.classList.add('visible');
+        }
+
+        function renderFrame(bands, numBars) {
+            const width = previewCanvas.width;
+            const height = previewCanvas.height;
+            
+            // Clear with dark background
+            ctx.fillStyle = '#0a0a0b';
+            ctx.fillRect(0, 0, width, height);
+            
+            if (selectedStyle === 'bars') {
+                renderBars(bands, numBars, width, height, false);
+            } else if (selectedStyle === 'mirrored') {
+                renderBars(bands, numBars, width, height, true);
+            } else if (selectedStyle === 'circular') {
+                renderCircular(bands, numBars, width, height);
+            } else if (selectedStyle === 'waveform') {
+                renderWaveform(bands, numBars, width, height);
+            }
+        }
+
+        function renderBars(bands, numBars, width, height, mirrored) {
+            const totalWidth = width * 0.85;
+            const gapRatio = 0.3;
+            const barWidth = totalWidth / (numBars + (numBars - 1) * gapRatio);
+            const gapWidth = barWidth * gapRatio;
+            const startX = (width - totalWidth) / 2;
+            const centerY = height / 2;
+            
+            for (let i = 0; i < numBars; i++) {
+                const x = startX + i * (barWidth + gapWidth);
+                const value = Math.min(bands[i], 1);
+                const barHeight = value * height * (mirrored ? 0.4 : 0.55);
+                
+                const [r, g, b] = getColor(selectedColor, i, numBars, value);
+                const alpha = 0.7 + value * 0.3;
+                
+                ctx.fillStyle = `rgba(${r}, ${g}, ${b}, ${alpha})`;
+                
+                if (mirrored) {
+                    // Top bar
+                    ctx.fillRect(x, centerY, barWidth, barHeight);
+                    // Bottom bar (mirrored)
+                    ctx.fillRect(x, centerY - barHeight, barWidth, barHeight);
+                } else {
+                    const y = centerY - barHeight / 2;
+                    ctx.fillRect(x, y, barWidth, barHeight);
+                    
+                    // Reflection
+                    const refHeight = barHeight * 0.12;
+                    ctx.fillStyle = `rgba(${r}, ${g}, ${b}, ${alpha * 0.12})`;
+                    ctx.fillRect(x, y + barHeight + 8, barWidth, refHeight);
+                }
+            }
+        }
+
+        function renderCircular(bands, numBars, width, height) {
+            const centerX = width / 2;
+            const centerY = height / 2;
+            const innerRadius = Math.min(width, height) * 0.15;
+            const maxBarLength = Math.min(width, height) * 0.25;
+            
+            ctx.lineWidth = 3;
+            ctx.lineCap = 'round';
+            
+            for (let i = 0; i < numBars; i++) {
+                const angle = (i / numBars) * Math.PI * 2 - Math.PI / 2;
+                const value = Math.min(bands[i], 1);
+                const barLength = innerRadius + value * maxBarLength;
+                
+                const [r, g, b] = getColor(selectedColor, i, numBars, value);
+                const alpha = 0.7 + value * 0.3;
+                
+                const x1 = centerX + innerRadius * Math.cos(angle);
+                const y1 = centerY + innerRadius * Math.sin(angle);
+                const x2 = centerX + barLength * Math.cos(angle);
+                const y2 = centerY + barLength * Math.sin(angle);
+                
+                ctx.strokeStyle = `rgba(${r}, ${g}, ${b}, ${alpha})`;
+                ctx.beginPath();
+                ctx.moveTo(x1, y1);
+                ctx.lineTo(x2, y2);
+                ctx.stroke();
+            }
+        }
+
+        function renderWaveform(bands, numBars, width, height) {
+            const centerY = height / 2;
+            const amplitude = height * 0.3;
+            const startX = width * 0.05;
+            const endX = width * 0.95;
+            const step = (endX - startX) / (numBars - 1);
+            
+            const [r, g, b] = getColor(selectedColor, 0, numBars, 0.5);
+            
+            // Fill
+            ctx.fillStyle = `rgba(${r}, ${g}, ${b}, 0.3)`;
+            ctx.beginPath();
+            ctx.moveTo(startX, centerY);
+            
+            for (let i = 0; i < numBars; i++) {
+                const x = startX + i * step;
+                const value = Math.min(bands[i], 1);
+                const y = centerY - value * amplitude;
+                ctx.lineTo(x, y);
+            }
+            
+            for (let i = numBars - 1; i >= 0; i--) {
+                const x = startX + i * step;
+                const value = Math.min(bands[i], 1);
+                const y = centerY + value * amplitude;
+                ctx.lineTo(x, y);
+            }
+            
+            ctx.closePath();
+            ctx.fill();
+            
+            // Stroke top
+            ctx.strokeStyle = `rgba(${r}, ${g}, ${b}, 0.9)`;
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(startX, centerY - bands[0] * amplitude);
+            for (let i = 1; i < numBars; i++) {
+                const x = startX + i * step;
+                const y = centerY - Math.min(bands[i], 1) * amplitude;
+                ctx.lineTo(x, y);
+            }
+            ctx.stroke();
+            
+            // Stroke bottom
+            ctx.beginPath();
+            ctx.moveTo(startX, centerY + bands[0] * amplitude);
+            for (let i = 1; i < numBars; i++) {
+                const x = startX + i * step;
+                const y = centerY + Math.min(bands[i], 1) * amplitude;
+                ctx.lineTo(x, y);
+            }
+            ctx.stroke();
+        }
+
+        // New video
+        newBtn.addEventListener('click', () => {
+            resultSection.classList.remove('visible');
+            uploadSection.style.display = 'block';
+            resultVideo.src = '';
+            
+            selectedFile = null;
+            audioBuffer = null;
+            generateBtn.disabled = true;
+            dropZone.classList.remove('has-file');
+            dropZone.innerHTML = `
+                <div class="drop-zone-icon">🎵</div>
+                <div class="drop-zone-text">Drop your audio file here</div>
+                <div class="drop-zone-hint">or click to browse • MP3, WAV, OGG, M4A</div>
+            `;
+            try { fileInput.value = ''; } catch (e) {}
+        });
+
+        function showError(msg) {
+            errorMessage.textContent = msg;
+            errorMessage.classList.add('visible');
+        }
+
+        function hideError() {
+            errorMessage.classList.remove('visible');
+        }
+    </script>
+</body>
+</html>
