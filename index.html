@@ -739,27 +739,30 @@
             const videoBlob = await recordingPromise;
             
             // Convert to MP4 using ffmpeg.wasm
-            progressText.textContent = 'Converting to MP4 (loading converter...)';
+            progressText.textContent = 'Converting to MP4 (first time loads ~25MB converter)...';
             progressBar.style.width = '92%';
             
             let mp4Blob;
             try {
                 mp4Blob = await convertToMp4(videoBlob, (progress) => {
                     progressBar.style.width = (92 + progress * 7) + '%';
+                    progressText.textContent = `Converting to MP4: ${Math.floor(progress * 100)}%`;
                 });
-                progressText.textContent = 'Complete!';
+                progressText.textContent = 'Complete! MP4 ready.';
                 progressBar.style.width = '100%';
             } catch (err) {
                 console.error('MP4 conversion failed, using WebM:', err);
                 mp4Blob = videoBlob; // Fallback to WebM
-                progressText.textContent = 'Complete! (WebM format)';
+                progressText.textContent = 'Complete! (WebM - MP4 converter unavailable)';
                 progressBar.style.width = '100%';
             }
             
             const videoUrl = URL.createObjectURL(mp4Blob);
             resultVideo.src = videoUrl;
             downloadBtn.href = videoUrl;
-            downloadBtn.download = `visualizer_${Date.now()}.${mp4Blob.type.includes('mp4') ? 'mp4' : 'webm'}`;
+            const isMp4 = mp4Blob.type.includes('mp4');
+            downloadBtn.download = `visualizer_${Date.now()}.${isMp4 ? 'mp4' : 'webm'}`;
+            downloadBtn.textContent = isMp4 ? 'Download MP4' : 'Download WebM';
             
             previewSection.classList.remove('visible');
             progressSection.classList.remove('visible');
